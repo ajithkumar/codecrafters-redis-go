@@ -18,6 +18,11 @@ func main() {
 
 	defer listener.Close()
 
+	toWorker := make(chan interface{}, 50)
+	fromWorker := make(chan string, 50)
+	storage := NewStorage()
+	go processMessageWorker(storage, toWorker, fromWorker)
+
 	for {
 		conn, err := listener.Accept()
 		fmt.Println("Incoming connection on port 8080")
@@ -27,11 +32,43 @@ func main() {
 			continue
 		}
 
-		go handleClient(conn)
+		go handleClient(conn, toWorker, fromWorker)
 	}
 }
 
-func handleClient(conn net.Conn) {
+func processMessageWorker(storage *Storage, fromMain <-chan interface{}, toMain chan<- string) {
+	for {
+		input := <-fromMain
+		command := command(input)
+		params := params(input)
+		outputPayload := ""
+
+		if command == "get" {
+			value, ok := storage.Get(params[0].(string))
+			if ok {
+				outputPayload = EncodeBulkString(value.value)
+			} else {
+				outputPayload = "$-1\r\n"
+			}
+		} else if command == "set" {
+			storage.Set(params[0].(string), params[1].(string))
+			outputPayload = "+OK\r\n"
+		} else {
+			outputPayload = "+OK\r\n"
+		}
+		toMain <- outputPayload
+	}
+}
+
+func command(input interface{}) string {
+	return strings.ToLower(input.([]interface{})[0].(string))
+}
+
+func params(input interface{}) []interface{} {
+	return input.([]interface{})[1:]
+}
+
+func handleClient(conn net.Conn, toWorker chan<- interface{}, fromWorker <-chan string) {
 	defer conn.Close()
 	for {
 		buf := make([]byte, 1024)
@@ -45,18 +82,19 @@ func handleClient(conn net.Conn) {
 
 		outputPayload := ""
 		inputPayload := string(buf[:n])
-		fmt.Printf("Incoming data on port 8080 : %s\n", inputPayload)
+
 		input, err := DecodeMessage(inputPayload)
 		if err != nil {
 			fmt.Printf("ERROR: Parsing message %s\n", err.Error())
 			return
 		}
-		if strings.ToLower(input.([]interface{})[0].(string)) == "ping" {
+		if command(input) == "ping" {
 			outputPayload = "+PONG\r\n"
-		} else if strings.ToLower(input.([]interface{})[0].(string)) == "echo" {
+		} else if command(input) == "echo" {
 			outputPayload = EncodeBulkString(input.([]interface{})[1].(string))
 		} else {
-			outputPayload = inputPayload
+			toWorker <- input
+			outputPayload = <-fromWorker
 		}
 
 		outputBytes := []byte(outputPayload)

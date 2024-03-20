@@ -56,6 +56,7 @@ func DecodeArray(list []string, off int) ([]interface{}, int, error) {
 }
 
 func DecodeBulkString(list []string, off int) (string, int, error) {
+	//TODO: handle length zero
 	str := list[off+1]
 	return str, off + 2, nil
 }
