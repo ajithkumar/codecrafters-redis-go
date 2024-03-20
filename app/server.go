@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -14,21 +15,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Server is listening on port 8080")
+	// fmt.Println("Server is listening on port 8080")
 
 	defer listener.Close()
 
-	toWorker := make(chan interface{}, 50)
-	fromWorker := make(chan string, 50)
+	toWorker := make(chan interface{}, 100)
+	fromWorker := make(chan string, 100)
 	storage := NewStorage()
 	go processMessageWorker(storage, toWorker, fromWorker)
 
 	for {
 		conn, err := listener.Accept()
-		fmt.Println("Incoming connection on port 8080")
+		// fmt.Println("Incoming connection on port 8080")
 
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println("ERROR:", err)
 			continue
 		}
 
@@ -51,7 +52,16 @@ func processMessageWorker(storage *Storage, fromMain <-chan interface{}, toMain 
 				outputPayload = "$-1\r\n"
 			}
 		} else if command == "set" {
-			storage.Set(params[0].(string), params[1].(string))
+			expiryMillis := 0
+			if strings.ToLower(params[2].(string)) == "px" {
+				tmpExpiryMillis, err := strconv.Atoi(params[3].(string))
+				if err != nil {
+					expiryMillis = 0
+				} else {
+					expiryMillis = tmpExpiryMillis
+				}
+			}
+			storage.Set(params[0].(string), params[1].(string), expiryMillis)
 			outputPayload = "+OK\r\n"
 		} else {
 			outputPayload = "+OK\r\n"
@@ -73,7 +83,7 @@ func handleClient(conn net.Conn, toWorker chan<- interface{}, fromWorker <-chan 
 	for {
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
-		fmt.Println("Incoming data on port 8080")
+		// fmt.Println("Incoming data on port 8080")
 
 		if err != nil {
 			fmt.Printf("ERROR: Incoming data %s\n", err.Error())
