@@ -53,7 +53,7 @@ func processMessageWorker(storage *Storage, fromMain <-chan interface{}, toMain 
 			}
 		} else if command == "set" {
 			expiryMillis := 0
-			if strings.ToLower(params[2].(string)) == "px" {
+			if len(params) > 2 && strings.ToLower(params[2].(string)) == "px" {
 				tmpExpiryMillis, err := strconv.Atoi(params[3].(string))
 				if err != nil {
 					expiryMillis = 0

@@ -34,6 +34,8 @@ func (s *Storage) Get(key string) (StorageValue, bool) {
 
 func (s *Storage) Set(key string, value string, expiry int) {
 	expiryTime := 0
-	expiryTime = int(time.Now().UnixMilli()) + expiry
+	if expiry > 0 {
+		expiryTime = int(time.Now().UnixMilli()) + expiry
+	}
 	s.values[key] = StorageValue{value: value, expiryTime: expiryTime}
 }
