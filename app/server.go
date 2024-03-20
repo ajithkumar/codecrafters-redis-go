@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -45,11 +46,16 @@ func handleClient(conn net.Conn) {
 		outputPayload := ""
 		inputPayload := string(buf[:n])
 		fmt.Printf("Incoming data on port 8080 : %s\n", inputPayload)
-
-		if inputPayload == "*1\r\n$4\r\nping\r\n" || inputPayload == "*1\r\n$4\r\nPING\r\n" {
+		input, err := DecodeMessage(inputPayload)
+		if err != nil {
+			fmt.Printf("ERROR: Parsing message %s\n", err.Error())
+			return
+		}
+		if strings.ToLower(input.([]interface{})[0].(string)) == "ping" {
 			outputPayload = "+PONG\r\n"
+		} else if strings.ToLower(input.([]interface{})[0].(string)) == "echo" {
+			outputPayload = EncodeBulkString(input.([]interface{})[1].(string))
 		} else {
-			// outputPayload = fmt.Sprintf("-ERR unknown command '%s'\r\n", inputPayload)
 			outputPayload = inputPayload
 		}
 
