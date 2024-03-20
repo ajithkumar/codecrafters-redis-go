@@ -27,6 +27,8 @@ func main() {
 	for {
 		// Block until we receive an incoming connection
 		conn, err := listener.Accept()
+		fmt.Println("Incoming connection on port 8080")
+
 		if err != nil {
 			fmt.Println("Error:", err)
 			continue
@@ -40,24 +42,29 @@ func main() {
 func handleClient(conn net.Conn) {
 	// Ensure we close the connection after we're done
 	defer conn.Close()
+	for {
+		// Read data
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		fmt.Println("Incoming data on port 8080")
 
-	// Read data
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return
+		if err != nil {
+			fmt.Printf("ERROR: Incoming data %s\n", err.Error())
+			return
+		}
+
+		outputPayload := ""
+		inputPayload := string(buf[:n])
+		fmt.Printf("Incoming data on port 8080 : %s\n", inputPayload)
+
+		if inputPayload == "*1\r\n$4\r\nping\r\n" || inputPayload == "*1\r\n$4\r\nPING\r\n" {
+			outputPayload = "+PONG\r\n"
+		} else {
+			// outputPayload = fmt.Sprintf("-ERR unknown command '%s'\r\n", inputPayload)
+			outputPayload = inputPayload
+		}
+
+		outputBytes := []byte(outputPayload)
+		conn.Write(outputBytes)
 	}
-
-	outputPayload := ""
-	inputPayload := string(buf[:n])
-
-	if inputPayload == "*1\r\n$4\r\nping\r\n" || inputPayload == "*1\r\n$4\r\nPING\r\n" {
-		outputPayload = "+PONG\r\n"
-	} else {
-		// outputPayload = fmt.Sprintf("-ERR unknown command '%s'\r\n", inputPayload)
-		outputPayload = inputPayload
-	}
-
-	outputBytes := []byte(outputPayload)
-	conn.Write(outputBytes)
 }
